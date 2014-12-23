@@ -5,20 +5,6 @@
 # You deserve to have this go wrong if you have spaces in your directory paths
 # (Nah, joking - I'll fix it when somebody complains)
 
-init() {
-  mkdir -p $TARGETDIR
-  if [[ "$(ls -A $TARGETDIR)" ]]; then
-    read -p "Directory is not empty, do you wish to proceed? (y/n)" -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-      exit 0
-    fi
-  fi
-  echo "initing $APP_NAME with template: $TEMPLATE"
-  cp -r $TEMPLATEDIR/_master/* $TARGETDIR/
-  add_app
-}
-
 munge_file() {
   local file=$1
   local variable=$2
@@ -27,24 +13,49 @@ munge_file() {
   mv $file $(echo $file | sed $MATCH)
 }
 
+munge_files() {
+  for file in $(find $TARGET_DIR -name "*\$*")
+  do
+    if [[ -d $file ]]; then
+      munge_file $file "app" $APP_NAME
+      munge_files
+      break
+    else
+      munge_file $file "app" $APP_NAME
+    fi
+  done
+}
+
 template_files() {
   local app=$1
   local variable=$2
   local value=$3
   local MATCH="s/\$$variable/$APP_NAME/g"
-  $(find $app -type f -exec sed -i $MATCH {} \;)
+  $(find $TARGET_DIR -type f -exec sed -i $MATCH {} \;)
 }
 
-add_app() {
-  local TARGET_APP_DIR=$TARGETDIR/apps/$APP_NAME
-  mkdir -p $TARGET_APP_DIR
-  cp -r $TEMPLATEDIR/$TEMPLATE/* $TARGET_APP_DIR
-  for file in $(find $TARGET_APP_DIR -name "*\$*")
-  do
-    munge_file $file "app" $APP_NAME
-  done
-  template_files $TARGET_APP_DIR  "app" $APP_NAME
+make() {
+  pushd $TARGET_DIR
+  $(make)
+  popd $TARGET_DIR
 }
+
+init() {
+  mkdir -p $TARGET_DIR
+  if [[ "$(ls -A $TARGET_DIR)" ]]; then
+    read -p "Directory is not empty, do you wish to proceed? (y/n)" -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+      exit 0
+    fi
+  fi
+  echo "initing $APP_NAME with template: $TEMPLATE"
+  cp -r $TEMPLATEDIR/$TEMPLATE/* $TARGET_DIR
+  munge_files
+  template_files $TARGET_DIR  "app" $APP_NAME
+#  make
+}
+
 
 usage() {
   echo "Usage foo"
@@ -55,7 +66,7 @@ usage() {
 COMMAND=$1
 TEMPLATE=empty
 APP_NAME=
-TARGETDIR=$(pwd)
+TARGET_DIR=$(pwd)
 OPTIND=2
 SOURCEDIR=$HOME/.vir
 TEMPLATEDIR=$SOURCEDIR/templates
@@ -68,7 +79,7 @@ case "$COMMAND" in
             TEMPLATE=$OPTARG
             ;;
           d)
-            TARGETDIR=$OPTARG
+            TARGET_DIR=$OPTARG
             ;;
           ?)
             echo "Error: unknown option -$OPTARG"
