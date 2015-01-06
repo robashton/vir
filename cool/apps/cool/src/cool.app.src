@@ -1,4 +1,4 @@
-{application, $app,
+{application, cool,
  [
   {description, ""},
   {vsn, "1.0.0"},
@@ -15,6 +15,6 @@
     gproc,
     shared
    ]},
-  {mod, { $app_app, []}},
+  {mod, { cool_app, []}},
   {env, []}
   ]}.

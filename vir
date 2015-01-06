@@ -34,10 +34,28 @@ template_files() {
   $(find $TARGET_DIR -type f -exec sed -i $MATCH {} \;)
 }
 
-make() {
-  pushd $TARGET_DIR
-  $(make)
-  popd $TARGET_DIR
+make_bootscript() {
+  local SCRIPT=""
+  if [[ -f "make_bootscript.sh" ]]; then
+    echo "Found local bootscript, using that as an override"
+    SCRIPT="./make_bootscript.sh"
+  else
+    SCRIPT="$SOURCEDIR/make_bootscript.sh"
+  fi
+  exec $SCRIPT
+}
+
+run_app() {
+  local SCRIPT=""
+  if [[ -f "run.sh" ]]; then
+    echo "Found local runscript, using that as an override"
+    $(./run.sh $@) # Need to trim args though
+  else
+    # Parse args
+    local rel_dir=apps/$APP_NAME/release-files
+    local boot=$APP_NAME
+    erl -pa deps/*/ebin deps/*/apps/*/ebin apps/*/ebin -setcookie $COOKIE $KERNEL -boot $boot -config $rel_dir/sys.config -$boot mode $RUN_MODE
+  fi
 }
 
 init() {
@@ -53,9 +71,10 @@ init() {
   cp -r $TEMPLATEDIR/$TEMPLATE/* $TARGET_DIR
   munge_files
   template_files $TARGET_DIR  "app" $APP_NAME
-#  make
+  cd $TARGET_DIR
+  make
+  make_bootscript
 }
-
 
 usage() {
   echo "Usage foo"
@@ -70,6 +89,9 @@ TARGET_DIR=$(pwd)
 OPTIND=2
 SOURCEDIR=$HOME/.vir
 TEMPLATEDIR=$SOURCEDIR/templates
+RUN_MODE=''
+COOKIE='cookie'
+KERNEL='-kernel inet_dist_listen_min 9100 inet_dist_listen_max 9105'
 
 case "$COMMAND" in
   "init")
@@ -93,6 +115,32 @@ case "$COMMAND" in
         usage "init"
       fi
       init $1
+    ;;
+  "boot")
+    make_bootscript
+    ;;
+  "run")
+    while getopts ":s:dlm:c:k:" option; do
+      case "$option" in
+        m)
+          RUN_MODE=$OPTARG
+          ;;
+        c)
+          COOKIE=$OPTARG
+          ;;
+        k)
+          KERNEL=$OPTARG
+          ;;
+        ?)
+          echo "Error: unknown option -$OPTARG"
+          usage
+          exit 1
+          ;;
+      esac
+    done
+    shift $(($OPTIND - 1))
+    APP_NAME=$1
+    run_app
     ;;
   *)
     usage
