@@ -163,7 +163,7 @@ build_tar() {
   local git_tag=$2
 
   local app=${PWD##*/}
-  local tar_dir="${app}_release_$git_tag"
+  local tar_dir="${app}_$git_tag"
   local tar_name="${tar_dir}.tar.gz"
   local autorun_name="$releases_folder/install-${tar_name%.tar.gz}"
 
