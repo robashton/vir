@@ -165,14 +165,16 @@ build_tar() {
   local app=${PWD##*/}
   local tar_dir="${app}_release_$git_tag"
   local tar_name="${tar_dir}.tar.gz"
-  local autorun_name="${tar_dir}.run"
+  local autorun_name="$releases_folder/install-${tar_name%.tar.gz}"
 
   echo Building $app Archive...
   rm -f $tar_name
   mv _rel/$app $tar_dir
   tar cfz $tar_name $tar_dir/  || { echo "Tar failed"; exit 1; }
-  mv $tar_name $releases_folder
   mv $tar_dir _rel/$app
+  cat $SOURCEDIR/autoextract.sh $tar_name > $autorun_name
+  rm $tar_name
+  chmod +x $autorun_name
   echo done
 }
 
