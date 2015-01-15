@@ -27,11 +27,16 @@ munge_files() {
 }
 
 template_files() {
-  local app=$1
+  local arrayname=$1[@]
+  local files=("${!arrayname}")
   local variable=$2
   local value=$3
-  local MATCH="s/\$$variable/$APP_NAME/g"
-  $(find $TARGET_DIR -type f -exec sed -i $MATCH {} \;)
+  local MATCH="s/\$$variable/$value/g"
+
+  for file in ${files[@]}
+  do
+    $(find $file -type f -exec sed -i "" $MATCH {} \;)
+  done
 }
 
 make_bootscript() {
@@ -190,11 +195,21 @@ init() {
   fi
   echo "initing $APP_NAME with template: $TEMPLATE"
   cp -r $TEMPLATEDIR/$TEMPLATE/* $TARGET_DIR
+
   munge_files
-  template_files $TARGET_DIR  "app" $APP_NAME
+
   cd $TARGET_DIR
-  make
-  make_bootscript
+
+  files_copied=($TEMPLATEDIR/$TEMPLATE/*)
+  files_copied_no_path=(${files_copied[@]#$TEMPLATEDIR/$TEMPLATE/})
+  files_copied_munged=(${files_copied_no_path[@]/\$app/$APP_NAME/})
+
+  template_files files_copied_munged "app" $APP_NAME
+
+  if [[ -f makefile ]]; then
+    make
+    make_bootscript
+  fi
 }
 
 usage() {
