@@ -1,0 +1,20 @@
+{application, $app,
+ [
+  {description, ""},
+  {vsn, "1.0.0"},
+  {registered, []},
+  {modules, []},
+  {included_applications, []},
+  {applications,
+   [
+    kernel,
+    jsx,
+    stdlib,
+    lager,
+    cowboy,
+    gproc,
+    shared
+   ]},
+  {mod, { $app_app, []}},
+  {env, []}
+  ]}.
