@@ -1,6 +1,6 @@
 #!/bin/bash
 
-ThisFile="$PWD/$0"
+ThisFile="$(which $0)"
 
 # search for the line number where script finishes and the tarball starts
 LinesToSkip=$(awk '/^__TARFILE_FOLLOWS__/ { print NR + 1; exit 0; }' $0)
