@@ -198,8 +198,62 @@ init() {
 }
 
 usage() {
-  echo "Usage foo"
-  exit 1
+  local cmd=$1
+  case $cmd in
+    "upgrade")
+      echo "vir upgrade"
+      echo "---"
+      echo "   updates the templates for vir (doesn't update this running script though)"
+      echo
+      ;;
+    "init")
+      echo "vir init [-t <template>] [-d <targetdir] <app_name>"
+      echo "---"
+      echo "  Creates a new project, optional defaults are:"
+      echo "  template: \"$TEMPLATE\""
+      echo "  targetdir: \"$TARGET_DIR\""
+      echo
+      ;;
+    "boot")
+      echo "vir boot"
+      echo "---"
+      echo "   Creates bootscripts for runnable applications"
+      echo "   This needs to be run whenever a new dependency is added to an application"
+      echo
+      ;;
+    "run")
+      echo "vir run [-m <mode>] [-c <cookie] [-k <kernelargs>] <app_name>"
+      echo "---"
+      echo "   Runs an application from the apps dir (by name), optional defaults are:"
+      echo "   defaults are:"
+      echo "   mode: \"$RUN_MODE\""
+      echo "   cookie: \"$COOKIE\""
+      echo "   kernelargs: \"$KERNEL\""
+      echo
+      ;;
+    "release")
+      echo "vir release [-d]"
+      echo "---"
+      echo "   Creates a self extracting tar of each application and updates the versions (if available)"
+      echo "   -d is a dirty release (don't build deps, don't clean all)"
+      echo "   use with caution"
+      echo "   if there is an install script found in bin/install.sh in the finished release, it will be executed"
+      echo "   on extraction"
+      echo
+      ;;
+    *)
+      echo
+      echo "vir is a tool for doing the basic Erlangy bits and bobs, see the below commands for more info"
+      echo "---"
+      echo
+      usage "upgrade"
+      usage "init"
+      usage "boot"
+      usage "run"
+      usage "release"
+      echo
+      ;;
+  esac
 }
 
 
@@ -215,7 +269,26 @@ DIRTYRELEASE=0
 COOKIE='cookie'
 KERNEL='-kernel inet_dist_listen_min 9100 inet_dist_listen_max 9105'
 
+
+check_vir_path() {
+  if [[ ! -d $SOURCEDIR ]]; then
+    echo "Vir installation not found, cloning repo into $SOURCEDIR"
+    git clone https://github.com/robashton/vir.git $SOURCEDIR
+  fi
+}
+
+upgrade_vir() {
+  pushd $SOURCEDIR > /dev/null
+  git pull
+  popd > /dev/null
+}
+
+check_vir_path
+
 case "$COMMAND" in
+  "upgrade")
+    upgrade_vir
+    ;;
   "init")
       while getopts ":t:d:" option; do
         case "$option" in
@@ -228,6 +301,7 @@ case "$COMMAND" in
           ?)
             echo "Error: unknown option -$OPTARG"
             usage "init"
+            exit 1
             ;;
         esac
       done
@@ -235,6 +309,7 @@ case "$COMMAND" in
       APP_NAME=$1
       if [[ -z $APP_NAME ]]; then
         usage "init"
+        exit 1
       fi
       init $1
     ;;
@@ -242,7 +317,7 @@ case "$COMMAND" in
     make_bootscript
     ;;
   "run")
-    while getopts ":s:dlm:c:k:" option; do
+    while getopts ":m:c:k:" option; do
       case "$option" in
         m)
           RUN_MODE=$OPTARG
@@ -281,5 +356,6 @@ case "$COMMAND" in
     ;;
   *)
     usage
+    exit 1
     ;;
 esac
