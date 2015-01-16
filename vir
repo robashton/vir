@@ -244,10 +244,17 @@ usage() {
       echo
       ;;
     "init")
-      echo "vir init [-t <template>] [-d <targetdir] <app_name>"
+      echo "vir init [-t <template>] [-d <targetdir>] <app_name>"
       echo "---"
       echo "  Creates a new project, optional defaults are:"
       echo "  template: \"$TEMPLATE\""
+      echo "  targetdir: \"$TARGET_DIR\""
+      echo
+      ;;
+    "update_deps")
+      echo "vir update_deps [-d <targetdir>] dep_pattern"
+      echo "---"
+      echo "  Updates all the dependencies in <targetdir>/deps that match dep_pattern.  Optional defaults are:"
       echo "  targetdir: \"$TARGET_DIR\""
       echo
       ;;
@@ -259,7 +266,7 @@ usage() {
       echo
       ;;
     "run")
-      echo "vir run [-m <mode>] [-c <cookie] [-k <kernelargs>] <app_name>"
+      echo "vir run [-m <mode>] [-c <cookie>] [-k <kernelargs>] <app_name>"
       echo "---"
       echo "   Runs an application from the apps dir (by name), optional defaults are:"
       echo "   defaults are:"
@@ -285,6 +292,7 @@ usage() {
       echo
       usage "upgrade"
       usage "init"
+      usage "update_deps"
       usage "boot"
       usage "run"
       usage "release"
