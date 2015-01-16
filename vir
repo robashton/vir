@@ -228,7 +228,7 @@ update_deps() {
   deps_to_process=(deps/*$DEPS_PATTERN*/)
   shopt -u nullglob
 
-  for dep in $deps_to_process ; do
+  for dep in ${deps_to_process[@]} ; do
     echo Updating $dep
     get_latest $dep
   done;
