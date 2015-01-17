@@ -65,7 +65,6 @@ run_app() {
 
 build_release() {
   local branch_name=$(git rev-parse --abbrev-ref HEAD)
-  echo Updating Release Number
   while read line
   do
       local build_no=`expr $line + 1`
@@ -81,12 +80,14 @@ build_release() {
       local minor=$line
   done < "deployment/minor_ver"
 
-  echo $build_no > "deployment/build_no"
-
   local release="v$major.$minor.$build_no-$branch_name"
 
-  if [[ -f "apps/shared/include/version.hrl" ]]; then
-    echo "-define(VERSION, \"$release\")." > apps/shared/include/version.hrl
+  if [[ $FAKERELEASE -eq 0 ]]; then
+    echo Updating Release Number
+    if [[ -f "apps/shared/include/version.hrl" ]]; then
+      echo "-define(VERSION, \"$release\")." > apps/shared/include/version.hrl
+    fi
+    echo $build_no > "deployment/build_no"
   fi
 
   echo Building Release $release
@@ -98,22 +99,27 @@ build_release() {
   fi
   make rel
 
-  # TODO: Deal with native deps if there are any
-  echo Making BoM and updating Git with new release tag
-  build_bill_of_materials $release "deployment/bill_of_materials"
 
-  git add deployment/build_no
-  git add deployment/bill_of_materials.txt
-  git add deployment/bill_of_materials.info
+  if [[ $FAKERELEASE -eq 0 ]]; then
+    # TODO: Deal with native deps if there are any
+    echo Making BoM and updating Git with new release tag
+    build_bill_of_materials $release "deployment/bill_of_materials"
 
-  ls -d apps/*/include | xargs -n 1 git add
+    git add deployment/build_no
+    git add deployment/bill_of_materials.txt
+    git add deployment/bill_of_materials.info
 
-  git tag $release
-  git commit -m "Automated build number increase: $build_no"
-  git push --tags
-  git push
+    ls -d apps/*/include | xargs -n 1 git add
 
-  echo Git updated for version $release
+    git tag $release
+    git commit -m "Automated build number increase: $build_no"
+    git push --tags
+    git push
+    echo Git updated for version $release
+  else
+    echo "Fake release, not bumping versions"
+  fi
+
   echo Building tars and publishing
   build_tars $release
 }
@@ -227,6 +233,9 @@ usage() {
       echo "  Creates a new project, optional defaults are:"
       echo "  template: \"$TEMPLATE\""
       echo "  targetdir: \"$TARGET_DIR\""
+      echo "  By default this will be in the current working directory"
+      echo "  Running this in an existing project will overlay a templates files in a non-destructive copy"
+      echo "  This means you can add apps after project creation"
       echo
       ;;
     "boot")
@@ -247,11 +256,12 @@ usage() {
       echo
       ;;
     "release")
-      echo "vir release [-d]"
+      echo "vir release [-d] [-f]"
       echo "---"
       echo "   Creates a self extracting tar of each application and updates the versions (if available)"
       echo "   -d is a dirty release (don't build deps, don't clean all)"
       echo "   use with caution"
+      echo "   -f means don't bump the version and create release artifacts - use this if testing locally"
       echo "   if there is an install script found in bin/install.sh in the finished release, it will be executed"
       echo "   on extraction"
       echo
@@ -281,6 +291,7 @@ SOURCEDIR=$HOME/.vir
 TEMPLATEDIR=$SOURCEDIR/templates
 RUN_MODE=''
 DIRTYRELEASE=0
+FAKERELEASE=0
 COOKIE='cookie'
 KERNEL='-kernel inet_dist_listen_min 9100 inet_dist_listen_max 9105'
 
@@ -355,10 +366,13 @@ case "$COMMAND" in
     run_app
     ;;
   "release")
-    while getopts ":d" option; do
+    while getopts ":df" option; do
       case "$option" in
         d)
           DIRTYRELEASE=1
+          ;;
+        f)
+          FAKERELEASE=1
           ;;
         ?)
           echo "Error: unknown option -$OPTARG"
