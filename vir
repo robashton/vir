@@ -97,8 +97,10 @@ build_release() {
     make clean-all
     make
   fi
-  make rel
 
+  find . -name "_rel" -type d | xargs rm -rf
+
+  make rel
 
   if [[ $FAKERELEASE -eq 0 ]]; then
     # TODO: Deal with native deps if there are any
