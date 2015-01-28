@@ -35,7 +35,9 @@ template_files() {
 
   for file in ${files[@]}
   do
-    $(find $file -type f -exec sed -i "" $MATCH {} \;)
+    if [[ -f $file ]]; then
+      sed -i "$MATCH" $file
+    fi
   done
 }
 
@@ -208,13 +210,14 @@ init() {
 
   cd $TARGET_DIR
 
-  files_copied=($TEMPLATEDIR/$TEMPLATE/*)
+  shopt -s globstar
+  files_copied=($TEMPLATEDIR/$TEMPLATE/**)
   files_copied_no_path=(${files_copied[@]#$TEMPLATEDIR/$TEMPLATE/})
-  files_copied_munged=(${files_copied_no_path[@]/\$app/$APP_NAME/})
+  files_copied_munged=(${files_copied_no_path[@]//\$app/$APP_NAME})
 
   template_files files_copied_munged "app" $APP_NAME
 
-  if [[ -f makefile ]]; then
+  if [[ -f Makefile ]]; then
     make
     make_bootscript
   fi
