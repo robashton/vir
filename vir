@@ -97,8 +97,10 @@ build_release() {
     make clean-all
     make
   fi
-  make rel
 
+  find . -name "_rel" -type d | xargs rm -rf
+
+  make rel
 
   if [[ $FAKERELEASE -eq 0 ]]; then
     # TODO: Deal with native deps if there are any
@@ -218,6 +220,28 @@ init() {
   fi
 }
 
+get_latest() {
+  pushd $1 > /dev/null
+  HeadName=`git rev-parse --abbrev-ref HEAD`
+  echo "On branch $HeadName"
+  if [ $HeadName == "HEAD" ] ; then
+    git checkout master
+  fi
+  git pull
+  popd > /dev/null
+}
+
+update_deps() {
+  shopt -s nullglob
+  deps_to_process=(deps/*$DEPS_PATTERN*/)
+  shopt -u nullglob
+
+  for dep in ${deps_to_process[@]} ; do
+    echo Updating $dep
+    get_latest $dep
+  done;
+}
+
 usage() {
   local cmd=$1
   case $cmd in
@@ -228,7 +252,7 @@ usage() {
       echo
       ;;
     "init")
-      echo "vir init [-t <template>] [-d <targetdir] <app_name>"
+      echo "vir init [-t <template>] [-d <targetdir>] <app_name>"
       echo "---"
       echo "  Creates a new project, optional defaults are:"
       echo "  template: \"$TEMPLATE\""
@@ -236,6 +260,13 @@ usage() {
       echo "  By default this will be in the current working directory"
       echo "  Running this in an existing project will overlay a templates files in a non-destructive copy"
       echo "  This means you can add apps after project creation"
+      echo
+      ;;
+    "update_deps")
+      echo "vir update_deps [-d <targetdir>] dep_pattern"
+      echo "---"
+      echo "  Updates all the dependencies in <targetdir>/deps that match dep_pattern.  Optional defaults are:"
+      echo "  targetdir: \"$TARGET_DIR\""
       echo
       ;;
     "boot")
@@ -246,7 +277,7 @@ usage() {
       echo
       ;;
     "run")
-      echo "vir run [-m <mode>] [-c <cookie] [-k <kernelargs>] <app_name>"
+      echo "vir run [-m <mode>] [-c <cookie>] [-k <kernelargs>] <app_name>"
       echo "---"
       echo "   Runs an application from the apps dir (by name), optional defaults are:"
       echo "   defaults are:"
@@ -273,6 +304,7 @@ usage() {
       echo
       usage "upgrade"
       usage "init"
+      usage "update_deps"
       usage "boot"
       usage "run"
       usage "release"
@@ -338,6 +370,27 @@ case "$COMMAND" in
         exit 1
       fi
       init $1
+    ;;
+  "update_deps")
+    while getopts ":d" option; do
+      case "$option" in
+        d)
+          TARGET_DIR=$OPTARG
+          ;;
+        ?)
+          echo "Error: unknown option -$OPTARG"
+          usage "update_deps"
+          exit 1
+          ;;
+      esac
+    done
+    shift $(($OPTIND - 1))
+    DEPS_PATTERN=$1
+    if [[ -z $DEPS_PATTERN ]]; then
+      usage "update_deps"
+      exit 1
+    fi
+    update_deps $DEPS_PATTERN
     ;;
   "boot")
     make_bootscript
