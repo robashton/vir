@@ -21,7 +21,7 @@ make_boot(AppName) ->
     {applications, Applications} = lists:keyfind(applications, 1, AppConfig),
 
     ReltoolConfig = [{config, {sys, [
-                                     {lib_dirs, ["apps", "deps"]},
+                                     {lib_dirs, get_lib_dirs()},
                                      {erts, [{mod_cond, derived}, {app_file, strip}]},
                                      {rel, AppName, "1", Applications ++ [list_to_atom(AppName)]},
                                      {boot_rel, AppName},
@@ -49,3 +49,17 @@ dirs_in(Wildcard) ->
 
 dirs_in(Wildcard, no_path) ->
     [filename:basename(Dir) || Dir <- dirs_in(Wildcard)].
+
+get_lib_dirs() ->
+    BaseDirs = ["apps", "deps"],
+
+    DetectedAppSrcFiles = filelib:wildcard("deps/**/*.app.src"),
+    DetectedAppContainingDirs = [apps_dir_from_src(AppSrcFile)||AppSrcFile<-DetectedAppSrcFiles],
+
+    sets:to_list(sets:from_list(BaseDirs ++ DetectedAppContainingDirs)).
+
+apps_dir_from_src(SrcFile) ->
+    SrcDir = filename:dirname(SrcFile),
+    AppDir = filename:dirname(SrcDir),
+    AppsDir = filename:dirname(AppDir),
+    AppsDir.
