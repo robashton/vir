@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # NOTE: None of this works if you have spaces in your directory paths
 # but seriously - who has spaces in their directory paths?
