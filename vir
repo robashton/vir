@@ -10,6 +10,7 @@ munge_file() {
   local variable=$2
   local value=$3
   local MATCH="s/\$$variable/$value/g"
+
   mv $file $(echo $file | sed $MATCH)
 }
 
@@ -35,8 +36,12 @@ template_files() {
 
   for file in ${files[@]}
   do
-    if [[ -f $file ]]; then
-      sed -i "$MATCH" $file
+      if [[ -f $file ]]; then
+          if [[ $(uname) == "Linux" ]]; then
+              sed -i "$MATCH" $file
+          else
+              sed -i "" "$MATCH" $file
+          fi
     fi
   done
 }
