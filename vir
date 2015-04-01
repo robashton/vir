@@ -107,7 +107,7 @@ build_release() {
 
   find . -name "_rel" -type d | xargs rm -rf
 
-  make rel
+  make $RELEASE_TARGET
 
   if [[ $FAKERELEASE -eq 0 ]]; then
     # TODO: Deal with native deps if there are any
@@ -169,7 +169,7 @@ build_tars() {
 
   mkdir -p $releases_folder
 
-  for relx_file in $(find "$PWD/apps" -name "relx.config")
+  for relx_file in $(find "$PWD/apps/$RELEASE_APP" -name "relx.config")
   do
     local app_dir=$(dirname "$relx_file")
     pushd $app_dir > /dev/null
@@ -427,13 +427,19 @@ case "$COMMAND" in
     run_app
     ;;
   "release")
-    while getopts ":df" option; do
+    RELEASE_TARGET=rel
+    RELEASE_APP=
+    while getopts ":dfa:" option; do
       case "$option" in
         d)
           DIRTYRELEASE=1
           ;;
         f)
           FAKERELEASE=1
+          ;;
+        a)
+          RELEASE_APP=$OPTARG
+          RELEASE_TARGET=$OPTARG.rel
           ;;
         ?)
           echo "Error: unknown option -$OPTARG"
