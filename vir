@@ -295,7 +295,7 @@ usage() {
       echo
       ;;
     "release")
-      echo "vir release [-d] [-f]"
+      echo "vir release [-d] [-f] [-a <app_name>]"
       echo "---"
       echo "   Creates a self extracting tar of each application and updates the versions (if available)"
       echo "   -d is a dirty release (don't build deps, don't clean all)"
@@ -303,6 +303,7 @@ usage() {
       echo "   -f means don't bump the version and create release artifacts - use this if testing locally"
       echo "   if there is an install script found in bin/install.sh in the finished release, it will be executed"
       echo "   on extraction"
+      echo "   -a app_name just does the release / tar of app_name"
       echo
       ;;
     *)
