@@ -10,6 +10,7 @@ munge_file() {
   local variable=$2
   local value=$3
   local MATCH="s/\$$variable/$value/g"
+
   mv $file $(echo $file | sed $MATCH)
 }
 
@@ -35,8 +36,12 @@ template_files() {
 
   for file in ${files[@]}
   do
-    if [[ -f $file ]]; then
-      sed -i "$MATCH" $file
+      if [[ -f $file ]]; then
+          if [[ $(uname) == "Linux" ]]; then
+              sed -i "$MATCH" $file
+          else
+              sed -i "" "$MATCH" $file
+          fi
     fi
   done
 }
@@ -102,7 +107,7 @@ build_release() {
 
   find . -name "_rel" -type d | xargs rm -rf
 
-  make rel
+  make $RELEASE_TARGET
 
   if [[ $FAKERELEASE -eq 0 ]]; then
     # TODO: Deal with native deps if there are any
@@ -164,7 +169,7 @@ build_tars() {
 
   mkdir -p $releases_folder
 
-  for relx_file in $(find "$PWD/apps" -name "relx.config")
+  for relx_file in $(find "$PWD/apps/$RELEASE_APP" -name "relx.config")
   do
     local app_dir=$(dirname "$relx_file")
     pushd $app_dir > /dev/null
@@ -290,7 +295,7 @@ usage() {
       echo
       ;;
     "release")
-      echo "vir release [-d] [-f]"
+      echo "vir release [-d] [-f] [-a <app_name>]"
       echo "---"
       echo "   Creates a self extracting tar of each application and updates the versions (if available)"
       echo "   -d is a dirty release (don't build deps, don't clean all)"
@@ -298,6 +303,7 @@ usage() {
       echo "   -f means don't bump the version and create release artifacts - use this if testing locally"
       echo "   if there is an install script found in bin/install.sh in the finished release, it will be executed"
       echo "   on extraction"
+      echo "   -a app_name just does the release / tar of app_name"
       echo
       ;;
     *)
@@ -422,13 +428,19 @@ case "$COMMAND" in
     run_app
     ;;
   "release")
-    while getopts ":df" option; do
+    RELEASE_TARGET=rel
+    RELEASE_APP=
+    while getopts ":dfa:" option; do
       case "$option" in
         d)
           DIRTYRELEASE=1
           ;;
         f)
           FAKERELEASE=1
+          ;;
+        a)
+          RELEASE_APP=$OPTARG
+          RELEASE_TARGET=$OPTARG.rel
           ;;
         ?)
           echo "Error: unknown option -$OPTARG"
