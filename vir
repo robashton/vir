@@ -187,6 +187,11 @@ build_tar() {
   local tar_name="${tar_dir}.tar.gz"
   local autorun_name="$releases_folder/install-${tar_name%.tar.gz}"
 
+  if [[ -f ./release-files/pre_tar.sh ]]; then
+      echo Running pre-tar script for $app
+      ./release-files/pre_tar.sh
+  fi
+
   echo Building $app Archive...
   rm -f $tar_name
   mv _rel/$app $tar_dir
