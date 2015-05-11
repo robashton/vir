@@ -66,7 +66,7 @@ run_app() {
     # Parse args
     local rel_dir=apps/$APP_NAME/release-files
     local boot=$APP_NAME
-    erl -pa deps/*/ebin deps/*/apps/*/ebin apps/*/ebin -setcookie $COOKIE $KERNEL -boot $boot -config $rel_dir/sys.config -$boot mode $RUN_MODE
+    erl -pa deps/*/ebin deps/*/apps/*/ebin apps/*/ebin -setcookie $COOKIE $KERNEL -boot $boot -config $rel_dir/sys.config -$boot mode $RUN_MODE $VARIABLES
   fi
 }
 
@@ -290,10 +290,9 @@ usage() {
       echo
       ;;
     "run")
-      echo "vir run [-m <mode>] [-c <cookie>] [-k <kernelargs>] <app_name>"
+      echo "vir run [-m <mode>] [-c <cookie>] [-k <kernelargs>] [-v <name=value>] <app_name>"
       echo "---"
       echo "   Runs an application from the apps dir (by name), optional defaults are:"
-      echo "   defaults are:"
       echo "   mode: \"$RUN_MODE\""
       echo "   cookie: \"$COOKIE\""
       echo "   kernelargs: \"$KERNEL\""
@@ -410,7 +409,7 @@ case "$COMMAND" in
     make_bootscript
     ;;
   "run")
-    while getopts ":m:c:k:" option; do
+    while getopts ":m:c:k:v:" option; do
       case "$option" in
         m)
           RUN_MODE=$OPTARG
@@ -421,6 +420,11 @@ case "$COMMAND" in
         k)
           KERNEL=$OPTARG
           ;;
+        v)
+            IFS='=' read NAME VALUE <<< "$OPTARG"
+            NAMES=(${NAMES[@]} $NAME)
+            VALUES=(${VALUES[@]} $VALUE)
+            ;;
         ?)
           echo "Error: unknown option -$OPTARG"
           usage
@@ -430,6 +434,11 @@ case "$COMMAND" in
     done
     shift $(($OPTIND - 1))
     APP_NAME=$1
+    n=0
+    for name in ${NAMES[@]}; do
+        VARIABLES="$VARIABLES -$APP_NAME $name ${VALUES[$n]}"
+        n=$(($n+1))
+    done
     run_app
     ;;
   "release")
