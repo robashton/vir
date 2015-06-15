@@ -10,7 +10,7 @@ export ERLMIBFLAGS =
 DEPS = lager cowboy gproc jsx
 
 dep_lager = git://github.com/basho/lager.git 2.0.1
-dep_cowboy = git@github.com:extend/cowboy.git b57f94661f5fd186f55eb0fead49849e0b1399d1
+dep_cowboy = git://github.com/ninenines/cowboy.git master
 dep_gproc = git://github.com/esl/gproc.git 0.2.12
 dep_jsx = git://github.com/talentdeficit/jsx.git master
 
