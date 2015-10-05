@@ -44,7 +44,8 @@ make_boot(AppName) ->
 
 dirs_in(Wildcard) ->
     [Dir || Dir <- filelib:wildcard(Wildcard),
-    filelib:is_dir(Dir), filelib:is_file(filename:join([Dir, "relx.config"]))].
+            filelib:is_dir(Dir),
+            filelib:is_file(filename:join([Dir, "relx.config"]))].
 
 
 dirs_in(Wildcard, no_path) ->

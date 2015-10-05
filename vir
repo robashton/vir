@@ -71,6 +71,11 @@ run_app() {
 }
 
 build_release() {
+  if [[ $(uname) != "Linux" ]]; then
+    echo "You are running $(uname), not Linux - aborting release"
+    exit 1
+  fi
+
   local branch_name=$(git rev-parse --abbrev-ref HEAD)
   while read line
   do
@@ -99,13 +104,13 @@ build_release() {
 
   echo Building Release $release
   if [[ $DIRTYRELEASE -eq 1 ]]; then
-    make -j apps
+    make apps
   else
     make clean-all
     make
   fi
 
-  find . -name "_rel" -type d | xargs rm -rf
+  find "$PWD/apps/$RELEASE_APP" -name "_rel" -type d | xargs rm -rf
 
   make $RELEASE_TARGET
 
