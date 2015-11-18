@@ -439,7 +439,6 @@ case "$COMMAND" in
         VARIABLES="$VARIABLES -$APP_NAME $name ${VALUES[$n]}"
         n=$(($n+1))
     done
-    echo "WWTFFF $VARIABLES"
     run_app
     ;;
   "release")
