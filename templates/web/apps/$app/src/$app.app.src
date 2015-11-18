@@ -12,8 +12,7 @@
     stdlib,
     lager,
     cowboy,
-    gproc,
-    shared
+    gproc
    ]},
   {mod, { $app_app, []}},
   {env, []}
