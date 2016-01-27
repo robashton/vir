@@ -72,10 +72,17 @@ run_app() {
 
 build_release() {
   local branch_name=$(git rev-parse --abbrev-ref HEAD)
+
   while read line
   do
-      local build_no=`expr $line + 1`
+      local prev_build_no=$line
   done < "deployment/build_no"
+
+  if [[ $RERELEASE -eq 0 ]]; then
+    local build_no=$((prev_build_no + 1))
+  else
+    local build_no=$prev_build_no
+  fi
 
   while read line
   do
@@ -89,7 +96,7 @@ build_release() {
 
   local release="v$major.$minor.$build_no-$branch_name"
 
-  if [[ $FAKERELEASE -eq 0 ]]; then
+  if [[ $RERELEASE -eq 0 ]]; then
     echo Updating Release Number
     if [[ -f "apps/shared/include/version.hrl" ]]; then
       echo "-define(VERSION, \"$release\")." > apps/shared/include/version.hrl
@@ -109,7 +116,9 @@ build_release() {
 
   make $RELEASE_TARGET
 
-  if [[ $FAKERELEASE -eq 0 ]]; then
+  if [[ $RERELEASE -eq 1 ]]; then
+    echo "Re-release, not bumping versions"
+  else
     # TODO: Deal with native deps if there are any
     echo Making BoM and updating Git with new release tag
     build_bill_of_materials $release "deployment/bill_of_materials"
@@ -125,8 +134,6 @@ build_release() {
     git push --tags
     git push
     echo Git updated for version $release
-  else
-    echo "Fake release, not bumping versions"
   fi
 
   echo Building tars and publishing
@@ -299,14 +306,13 @@ usage() {
       echo
       ;;
     "release")
-      echo "vir release [-d] [-f] [-a <app_name>]"
+      echo "vir release [-d] [-r] [-a <app_name>]"
       echo "---"
       echo "   Creates a self extracting tar of each application and updates the versions (if available)"
       echo "   -d is a dirty release (don't build deps, don't clean all)"
       echo "   use with caution"
-      echo "   -f means don't bump the version and create release artifacts - use this if testing locally"
-      echo "   if there is an install script found in bin/install.sh in the finished release, it will be executed"
-      echo "   on extraction"
+      echo "   -r is used to re-release whatever the current version number is, so the current version number"
+      echo "   is used without being incremented. Use with care."
       echo "   -a app_name just does the release / tar of app_name"
       echo
       ;;
@@ -336,7 +342,7 @@ SOURCEDIR=$HOME/.vir
 TEMPLATEDIR=$SOURCEDIR/templates
 RUN_MODE=''
 DIRTYRELEASE=0
-FAKERELEASE=0
+RERELEASE=0
 COOKIE='cookie'
 KERNEL='-kernel inet_dist_listen_min 9100 inet_dist_listen_max 9105'
 
@@ -444,13 +450,13 @@ case "$COMMAND" in
   "release")
     RELEASE_TARGET=rel
     RELEASE_APP=
-    while getopts ":dfa:" option; do
+    while getopts ":dra:" option; do
       case "$option" in
         d)
           DIRTYRELEASE=1
           ;;
-        f)
-          FAKERELEASE=1
+        r)
+          RERELEASE=1
           ;;
         a)
           RELEASE_APP=$OPTARG
