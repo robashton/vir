@@ -66,7 +66,8 @@ run_app() {
     # Parse args
     local rel_dir=apps/$APP_NAME/release-files
     local boot=$APP_NAME
-    erl -pa deps/*/ebin deps/*/apps/*/ebin apps/*/ebin -setcookie $COOKIE $KERNEL -boot $boot -config $rel_dir/sys.config -$boot mode $RUN_MODE $VARIABLES
+
+    erl -pa deps/*/ebin deps/*/apps/*/ebin apps/*/ebin $DETACHED -setcookie $COOKIE $KERNEL -boot $boot -config $rel_dir/sys.config -$boot mode $RUN_MODE $VARIABLES
   fi
 }
 
@@ -414,7 +415,7 @@ case "$COMMAND" in
     make_bootscript
     ;;
   "run")
-    while getopts ":m:c:k:v:" option; do
+    while getopts ":m:c:k:v:d" option; do
       case "$option" in
         m)
           RUN_MODE=$OPTARG
@@ -429,6 +430,9 @@ case "$COMMAND" in
             IFS='=' read NAME VALUE <<< "$OPTARG"
             NAMES=(${NAMES[@]} $NAME)
             VALUES=(${VALUES[@]} $VALUE)
+            ;;
+        d)
+            DETACHED="-noinput -noshell"
             ;;
         ?)
           echo "Error: unknown option -$OPTARG"
