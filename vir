@@ -79,6 +79,7 @@ build_release() {
   done < "deployment/build_no"
 
   if [[ $RERELEASE -eq 0 ]]; then
+    echo Updating Release Number
     local build_no=$((prev_build_no + 1))
   else
     local build_no=$prev_build_no
@@ -96,11 +97,15 @@ build_release() {
 
   local release="v$major.$minor.$build_no-$branch_name"
 
+  # Update version on disc even if we're re-releasing
+  # because we might have switched branch in which case
+  # the full release name will change even though the build
+  # number didn't
+  if [[ -f "apps/shared/include/version.hrl" ]]; then
+    echo "-define(VERSION, \"$release\")." > apps/shared/include/version.hrl
+  fi
+
   if [[ $RERELEASE -eq 0 ]]; then
-    echo Updating Release Number
-    if [[ -f "apps/shared/include/version.hrl" ]]; then
-      echo "-define(VERSION, \"$release\")." > apps/shared/include/version.hrl
-    fi
     echo $build_no > "deployment/build_no"
   fi
 
