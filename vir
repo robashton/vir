@@ -66,11 +66,17 @@ run_app() {
     # Parse args
     local rel_dir=apps/$APP_NAME/release-files
     local boot=$APP_NAME
-    erl -pa deps/*/ebin deps/*/apps/*/ebin apps/*/ebin -setcookie $COOKIE $KERNEL -boot $boot -config $rel_dir/sys.config -$boot mode $RUN_MODE $VARIABLES
+
+    erl -pa deps/*/ebin deps/*/apps/*/ebin apps/*/ebin $DETACHED -setcookie $COOKIE $KERNEL -boot $boot -config $rel_dir/sys.config -$boot mode $RUN_MODE $VARIABLES
   fi
 }
 
 build_release() {
+  if [[ $(uname) != "Linux" ]]; then
+    echo "You are running $(uname), not Linux - aborting release"
+    exit 1
+  fi
+
   local branch_name=$(git rev-parse --abbrev-ref HEAD)
 
   while read line
@@ -111,13 +117,13 @@ build_release() {
 
   echo Building Release $release
   if [[ $DIRTYRELEASE -eq 1 ]]; then
-    make -j apps
+    make apps
   else
     make clean-all
     make
   fi
 
-  find . -name "_rel" -type d | xargs rm -rf
+  find "$PWD/apps/$RELEASE_APP" -name "_rel" -type d | xargs rm -rf
 
   make $RELEASE_TARGET
 
@@ -349,7 +355,7 @@ RUN_MODE=''
 DIRTYRELEASE=0
 RERELEASE=0
 COOKIE='cookie'
-KERNEL='-kernel inet_dist_listen_min 9100 inet_dist_listen_max 9105'
+KERNEL='-kernel inet_dist_listen_min 9100 inet_dist_listen_max 9105 +K true +A 10'
 
 
 check_vir_path() {
@@ -420,7 +426,7 @@ case "$COMMAND" in
     make_bootscript
     ;;
   "run")
-    while getopts ":m:c:k:v:" option; do
+    while getopts ":m:c:k:v:d" option; do
       case "$option" in
         m)
           RUN_MODE=$OPTARG
@@ -435,6 +441,9 @@ case "$COMMAND" in
             IFS='=' read NAME VALUE <<< "$OPTARG"
             NAMES=(${NAMES[@]} $NAME)
             VALUES=(${VALUES[@]} $VALUE)
+            ;;
+        d)
+            DETACHED="-noinput -noshell"
             ;;
         ?)
           echo "Error: unknown option -$OPTARG"
