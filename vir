@@ -66,8 +66,11 @@ run_app() {
     # Parse args
     local rel_dir=apps/$APP_NAME/release-files
     local boot=$APP_NAME
-
-    erl -pa deps/*/ebin deps/*/apps/*/ebin apps/*/ebin $DETACHED -setcookie $COOKIE $KERNEL -boot $boot -config $rel_dir/sys.config -$boot mode $RUN_MODE $VARIABLES
+    local sname=""
+    if [[ ! -z $NODENAME ]]; then 
+      local sname="-sname $NODENAME"
+    fi
+    erl -pa deps/*/ebin deps/*/apps/*/ebin apps/*/ebin $sname $DETACHED -setcookie $COOKIE $KERNEL -boot $boot -config $rel_dir/sys.config -$boot mode $RUN_MODE $VARIABLES
   fi
 }
 
@@ -215,10 +218,16 @@ build_tar() {
   mv _rel/$app $tar_dir
   tar cfz $tar_name $tar_dir/  || { echo "Tar failed"; exit 1; }
   mv $tar_dir _rel/$app
-  cat $SOURCEDIR/autoextract.sh $tar_name > $autorun_name
+
+  if [[ -f ./release-files/post_tar.sh ]]; then
+    echo Running post-tar script for $app
+    ./release-files/post_tar.sh $tar_name $git_tag
+  else
+    cat $SOURCEDIR/autoextract.sh $tar_name > $autorun_name
+    chmod +x $autorun_name
+    echo done
+  fi
   rm $tar_name
-  chmod +x $autorun_name
-  echo done
 }
 
 
@@ -308,7 +317,7 @@ usage() {
       echo
       ;;
     "run")
-      echo "vir run [-m <mode>] [-c <cookie>] [-k <kernelargs>] [-v <name=value>] <app_name>"
+      echo "vir run [-n <nodename>] [-m <mode>] [-c <cookie>] [-k <kernelargs>] [-v <name=value>] <app_name>"
       echo "---"
       echo "   Runs an application from the apps dir (by name), optional defaults are:"
       echo "   mode: \"$RUN_MODE\""
@@ -347,6 +356,7 @@ usage() {
 COMMAND=$1
 TEMPLATE=empty
 APP_NAME=
+NODENAME=
 TARGET_DIR=$(pwd)
 OPTIND=2
 SOURCEDIR=$HOME/.vir
@@ -426,13 +436,16 @@ case "$COMMAND" in
     make_bootscript
     ;;
   "run")
-    while getopts ":m:c:k:v:d" option; do
+    while getopts ":m:n:c:k:v:d" option; do
       case "$option" in
         m)
           RUN_MODE=$OPTARG
           ;;
         c)
           COOKIE=$OPTARG
+          ;;
+        n)
+          NODENAME=$OPTARG
           ;;
         k)
           KERNEL=$OPTARG
