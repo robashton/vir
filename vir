@@ -67,9 +67,15 @@ run_app() {
     local rel_dir=apps/$APP_NAME/release-files
     local boot=$APP_NAME
     local sname=""
-    if [[ ! -z $NODENAME ]]; then 
-      local sname="-sname $NODENAME"
+
+    if [[ ! -z $NODENAME ]]; then
+      if [[ $NODENAME = "@" ]]; then
+        local sname="-name $NODENAME"
+      else
+        local sname="-name $NODENAME@$(hostname -I)"
+      fi
     fi
+
     erl -pa deps/*/ebin deps/*/apps/*/ebin apps/*/ebin $sname $DETACHED -setcookie $COOKIE $KERNEL -boot $boot -config $rel_dir/sys.config -$boot mode $RUN_MODE $VARIABLES
   fi
 }
