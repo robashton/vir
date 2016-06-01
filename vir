@@ -1,85 +1,5 @@
 #!/usr/bin/env bash
 
-# NOTE: None of this works if you have spaces in your directory paths
-# but seriously - who has spaces in their directory paths?
-# You deserve to have this go wrong if you have spaces in your directory paths
-# (Nah, joking - I'll fix it when somebody complains)
-
-munge_file() {
-  local file=$1
-  local variable=$2
-  local value=$3
-  local MATCH="s/\$$variable/$value/g"
-
-  mv $file $(echo $file | sed $MATCH)
-}
-
-munge_files() {
-  for file in $(find $TARGET_DIR -name "*\$*")
-  do
-    if [[ -d $file ]]; then
-      munge_file $file "app" $APP_NAME
-      munge_files
-      break
-    else
-      munge_file $file "app" $APP_NAME
-    fi
-  done
-}
-
-template_files() {
-  local arrayname=$1[@]
-  local files=("${!arrayname}")
-  local variable=$2
-  local value=$3
-  local MATCH="s/\$$variable/$value/g"
-
-  for file in ${files[@]}
-  do
-      if [[ -f $file ]]; then
-          if [[ $(uname) == "Linux" ]]; then
-              sed -i "$MATCH" $file
-          else
-              sed -i "" "$MATCH" $file
-          fi
-    fi
-  done
-}
-
-make_bootscript() {
-  local SCRIPT=""
-  if [[ -f "make_bootscript.sh" ]]; then
-    echo "Found local bootscript, using that as an override"
-    SCRIPT="./make_bootscript.sh"
-  else
-    SCRIPT="$SOURCEDIR/make_bootscript.sh"
-  fi
-  exec $SCRIPT
-}
-
-run_app() {
-  local SCRIPT=""
-  if [[ -f "run.sh" ]]; then
-    echo "Found local runscript, using that as an override"
-    $(./run.sh $@) # Need to trim args though
-  else
-    # Parse args
-    local rel_dir=apps/$APP_NAME/release-files
-    local boot=$APP_NAME
-    local sname=""
-
-    if [[ ! -z $NODENAME ]]; then
-      if [[ $NODENAME = "@" ]]; then
-        local sname="-name $NODENAME"
-      else
-        local sname="-name $NODENAME@$(hostname -I)"
-      fi
-    fi
-
-    erl -pa deps/*/ebin deps/*/apps/*/ebin apps/*/ebin $sname $DETACHED -setcookie $COOKIE $KERNEL -boot $boot -config $rel_dir/sys.config -$boot mode $RUN_MODE $VARIABLES
-  fi
-}
-
 build_release() {
   if [[ $(uname) != "Linux" ]]; then
     echo "You are running $(uname), not Linux - aborting release"
@@ -126,15 +46,18 @@ build_release() {
 
   echo Building Release $release
   if [[ $DIRTYRELEASE -eq 1 ]]; then
-    make apps
+    echo "Not cleaning because it's a dirty release"
   else
-    make clean-all
-    make
+    rebar3 clean
   fi
 
-  find "$PWD/apps/$RELEASE_APP" -name "_rel" -type d | xargs rm -rf
-
-  make $RELEASE_TARGET
+  if [[ -z $RELEASE_APP ]]; then
+    echo "Releasing all apps"
+    ls -l apps | awk '{print $9}' | xargs -L 1 rebar3 release -n
+  else
+    echo "Releasing $RELEASE_APP"
+    rebar3 release $RELEASE_APP
+  fi
 
   if [[ $RERELEASE -eq 1 ]]; then
     echo "Re-release, not bumping versions"
@@ -195,21 +118,26 @@ build_tars() {
   local releases_folder="$PWD/releases"
 
   mkdir -p $releases_folder
-
-  for relx_file in $(find "$PWD/apps/$RELEASE_APP" -name "relx.config")
-  do
-    local app_dir=$(dirname "$relx_file")
-    pushd $app_dir > /dev/null
-    build_tar $releases_folder $git_tag
-    popd
-  done
+  
+  if [[ -z $RELEASE_APP ]]; then
+    for app in $(ls _build/default/rel)
+    do
+      local app_dir=_build/default/rel/$app
+      build_tar $app_dir $releases_folder $git_tag
+    done
+  else
+    local app_dir=_build/default/rel/$RELEASE_APP
+    build_tar $app_dir $releases_folder $git_tag
+  fi
 }
 
 build_tar() {
-  local releases_folder=$1
-  local git_tag=$2
+  local app_dir=$1
+  local releases_folder=$2
+  local git_tag=$3
 
-  local app=${PWD##*/}
+  local app=$(basename $app_dir)
+  local working_dir=$(dirname $app_dir)
   local tar_dir="${app}_$git_tag"
   local tar_name="${tar_dir}.tar.gz"
   local autorun_name="$releases_folder/install-${tar_name%.tar.gz}"
@@ -221,49 +149,20 @@ build_tar() {
 
   echo Building $app Archive...
   rm -f $tar_name
-  mv _rel/$app $tar_dir
-  tar cfz $tar_name $tar_dir/  || { echo "Tar failed"; exit 1; }
-  mv $tar_dir _rel/$app
+
+  mv $app_dir $working_dir/$tar_dir
+  tar cfz $releases_folder/$tar_name $working_dir/$tar_dir  || { echo "Tar failed"; exit 1; }
+  mv $working_dir/$tar_dir $app_dir
 
   if [[ -f ./release-files/post_tar.sh ]]; then
     echo Running post-tar script for $app
     ./release-files/post_tar.sh $tar_name $git_tag
   else
-    cat $SOURCEDIR/autoextract.sh $tar_name > $autorun_name
+    cat $SOURCEDIR/autoextract.sh $releases_folder/$tar_name > $autorun_name
     chmod +x $autorun_name
     echo done
   fi
-  rm $tar_name
-}
-
-
-init() {
-  mkdir -p $TARGET_DIR
-  if [[ "$(ls -A $TARGET_DIR)" ]]; then
-    read -p "Directory is not empty, do you wish to proceed? (y/n)" -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-      exit 0
-    fi
-  fi
-  echo "initing $APP_NAME with template: $TEMPLATE"
-  cp -r $TEMPLATEDIR/$TEMPLATE/* $TARGET_DIR
-
-  munge_files
-
-  cd $TARGET_DIR
-
-  shopt -s globstar
-  files_copied=($TEMPLATEDIR/$TEMPLATE/**)
-  files_copied_no_path=(${files_copied[@]#$TEMPLATEDIR/$TEMPLATE/})
-  files_copied_munged=(${files_copied_no_path[@]//\$app/$APP_NAME})
-
-  template_files files_copied_munged "app" $APP_NAME
-
-  if [[ -f Makefile ]]; then
-    make
-    make_bootscript
-  fi
+  rm $releases_folder/$tar_name
 }
 
 get_latest() {
@@ -277,17 +176,6 @@ get_latest() {
   popd > /dev/null
 }
 
-update_deps() {
-  shopt -s nullglob
-  deps_to_process=(deps/*$DEPS_PATTERN*/)
-  shopt -u nullglob
-
-  for dep in ${deps_to_process[@]} ; do
-    echo Updating $dep
-    get_latest $dep
-  done;
-}
-
 usage() {
   local cmd=$1
   case $cmd in
@@ -295,40 +183,6 @@ usage() {
       echo "vir upgrade"
       echo "---"
       echo "   updates the templates for vir (doesn't update this running script though)"
-      echo
-      ;;
-    "init")
-      echo "vir init [-t <template>] [-d <targetdir>] <app_name>"
-      echo "---"
-      echo "  Creates a new project, optional defaults are:"
-      echo "  template: \"$TEMPLATE\""
-      echo "  targetdir: \"$TARGET_DIR\""
-      echo "  By default this will be in the current working directory"
-      echo "  Running this in an existing project will overlay a templates files in a non-destructive copy"
-      echo "  This means you can add apps after project creation"
-      echo
-      ;;
-    "update_deps")
-      echo "vir update_deps [-d <targetdir>] dep_pattern"
-      echo "---"
-      echo "  Updates all the dependencies in <targetdir>/deps that match dep_pattern.  Optional defaults are:"
-      echo "  targetdir: \"$TARGET_DIR\""
-      echo
-      ;;
-    "boot")
-      echo "vir boot"
-      echo "---"
-      echo "   Creates bootscripts for runnable applications"
-      echo "   This needs to be run whenever a new dependency is added to an application"
-      echo
-      ;;
-    "run")
-      echo "vir run [-n <nodename>] [-m <mode>] [-c <cookie>] [-k <kernelargs>] [-v <name=value>] <app_name>"
-      echo "---"
-      echo "   Runs an application from the apps dir (by name), optional defaults are:"
-      echo "   mode: \"$RUN_MODE\""
-      echo "   cookie: \"$COOKIE\""
-      echo "   kernelargs: \"$KERNEL\""
       echo
       ;;
     "release")
@@ -344,20 +198,15 @@ usage() {
       ;;
     *)
       echo
-      echo "vir is a tool for doing the basic Erlangy bits and bobs, see the below commands for more info"
+      echo "Vir is just a release manager on top of rebar3"
       echo "---"
       echo
       usage "upgrade"
-      usage "init"
-      usage "update_deps"
-      usage "boot"
-      usage "run"
       usage "release"
       echo
       ;;
   esac
 }
-
 
 COMMAND=$1
 TEMPLATE=empty
@@ -372,7 +221,6 @@ DIRTYRELEASE=0
 RERELEASE=0
 COOKIE='cookie'
 KERNEL='-kernel inet_dist_listen_min 9100 inet_dist_listen_max 9105 +K true +A 10'
-
 
 check_vir_path() {
   if [[ ! -d $SOURCEDIR ]]; then
@@ -393,95 +241,7 @@ case "$COMMAND" in
   "upgrade")
     upgrade_vir
     ;;
-  "init")
-      while getopts ":t:d:" option; do
-        case "$option" in
-          t)
-            TEMPLATE=$OPTARG
-            ;;
-          d)
-            TARGET_DIR=$OPTARG
-            ;;
-          ?)
-            echo "Error: unknown option -$OPTARG"
-            usage "init"
-            exit 1
-            ;;
-        esac
-      done
-      shift $(($OPTIND - 1))
-      APP_NAME=$1
-      if [[ -z $APP_NAME ]]; then
-        usage "init"
-        exit 1
-      fi
-      init $1
-    ;;
-  "update_deps")
-    while getopts ":d" option; do
-      case "$option" in
-        d)
-          TARGET_DIR=$OPTARG
-          ;;
-        ?)
-          echo "Error: unknown option -$OPTARG"
-          usage "update_deps"
-          exit 1
-          ;;
-      esac
-    done
-    shift $(($OPTIND - 1))
-    DEPS_PATTERN=$1
-    if [[ -z $DEPS_PATTERN ]]; then
-      usage "update_deps"
-      exit 1
-    fi
-    update_deps $DEPS_PATTERN
-    ;;
-  "boot")
-    make_bootscript
-    ;;
-  "run")
-    while getopts ":m:n:c:k:v:d" option; do
-      case "$option" in
-        m)
-          RUN_MODE=$OPTARG
-          ;;
-        c)
-          COOKIE=$OPTARG
-          ;;
-        n)
-          NODENAME=$OPTARG
-          ;;
-        k)
-          KERNEL=$OPTARG
-          ;;
-        v)
-            IFS='=' read NAME VALUE <<< "$OPTARG"
-            NAMES=(${NAMES[@]} $NAME)
-            VALUES=(${VALUES[@]} $VALUE)
-            ;;
-        d)
-            DETACHED="-noinput -noshell"
-            ;;
-        ?)
-          echo "Error: unknown option -$OPTARG"
-          usage
-          exit 1
-          ;;
-      esac
-    done
-    shift $(($OPTIND - 1))
-    APP_NAME=$1
-    n=0
-    for name in ${NAMES[@]}; do
-        VARIABLES="$VARIABLES -$APP_NAME $name ${VALUES[$n]}"
-        n=$(($n+1))
-    done
-    run_app
-    ;;
   "release")
-    RELEASE_TARGET=rel
     RELEASE_APP=
     while getopts ":dra:" option; do
       case "$option" in
@@ -493,7 +253,6 @@ case "$COMMAND" in
           ;;
         a)
           RELEASE_APP=$OPTARG
-          RELEASE_TARGET=$OPTARG.rel
           ;;
         ?)
           echo "Error: unknown option -$OPTARG"
