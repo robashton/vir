@@ -53,10 +53,10 @@ build_release() {
 
   if [[ -z $RELEASE_APP ]]; then
     echo "Releasing all apps"
-    ls -l apps | awk '{print $9}' | xargs -L 1 rebar3 release -n
+#    ls -l apps | awk '{print $9}' | xargs -L 1 rebar3 release -n
   else
     echo "Releasing $RELEASE_APP"
-    rebar3 release $RELEASE_APP
+#    rebar3 release $RELEASE_APP
   fi
 
   if [[ $RERELEASE -eq 1 ]]; then
@@ -150,9 +150,11 @@ build_tar() {
   echo Building $app Archive...
   rm -f $tar_name
 
-  mv $app_dir $working_dir/$tar_dir
-  tar cfz $releases_folder/$tar_name $working_dir/$tar_dir  || { echo "Tar failed"; exit 1; }
-  mv $working_dir/$tar_dir $app_dir
+  pushd $working_dir > /dev/null
+  mv $app $tar_dir
+  tar cfz $releases_folder/$tar_name $tar_dir  || { echo "Tar failed"; exit 1; }
+  mv $tar_dir $app
+  popd > /dev/null
 
   if [[ -f ./release-files/post_tar.sh ]]; then
     echo Running post-tar script for $app
