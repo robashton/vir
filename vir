@@ -6,31 +6,40 @@ build_release() {
     exit 1
   fi
 
-  local branch_name=$(git rev-parse --abbrev-ref HEAD)
-
-  while read line
-  do
+  if [[ -z "$MANUAL_VERSION" ]]; then
+    while read line
+    do
       local prev_build_no=$line
-  done < "deployment/build_no"
+    done < "deployment/build_no"
 
-  if [[ $RERELEASE -eq 0 ]]; then
-    echo Updating Release Number
-    local build_no=$((prev_build_no + 1))
+    if [[ $RERELEASE -eq 0 ]]; then
+      echo Updating Release Number
+      local build_no=$((prev_build_no + 1))
+    else
+      local build_no=$prev_build_no
+    fi
+
+    while read line
+    do
+      local major=$line
+    done < "deployment/major_ver"
+
+    while read line
+    do
+      local minor=$line
+    done < "deployment/minor_ver"
   else
-    local build_no=$prev_build_no
+    IFS="." read major minor build_no <<< "$MANUAL_VERSION"
   fi
 
-  while read line
-  do
-      local major=$line
-  done < "deployment/major_ver"
+  if [[ -z $MANUAL_VERSION_LABEL ]]; then
+    local branch_name=$(git rev-parse --abbrev-ref HEAD)
+    local release="v$major.$minor.$build_no-$branch_name"
+  else
+    local release="$MANUAL_VERSION_LABEL"
+  fi
 
-  while read line
-  do
-      local minor=$line
-  done < "deployment/minor_ver"
-
-  local release="v$major.$minor.$build_no-$branch_name"
+  echo "Version $major.$minor.$build_no: $release"
 
   # Update version on disc even if we're re-releasing
   # because we might have switched branch in which case
@@ -40,8 +49,11 @@ build_release() {
     echo "-define(VERSION, \"$release\")." > apps/shared/include/version.hrl
   fi
 
-  if [[ $RERELEASE -eq 0 ]]; then
-    echo $build_no > "deployment/build_no"
+  if [[ $RERELEASE -eq 0 ]] || [[ -n $MANUAL_VERSION ]] || [[ -n $MANUAL_VERSION_LABEL ]]; then
+    echo "$major" > "deployment/major_ver"
+    echo "$minor" > "deployment/minor_ver"
+    echo "$build_no" > "deployment/build_no"
+    echo "$release" > "deployment/label"
   fi
 
   echo Building Release $release
@@ -59,13 +71,15 @@ build_release() {
     rebar3 release $RELEASE_APP
   fi
 
-  if [[ $RERELEASE -eq 1 ]]; then
-    echo "Re-release, not bumping versions"
-  else
+  if [[ $RERELEASE -eq 0 ]] || [[ -n $MANUAL_VERSION ]] || [[ -n $MANUAL_VERSION_LABEL ]]; then
     # TODO: Deal with native deps if there are any
     echo Making BoM and updating Git with new release tag
     build_bill_of_materials $release "deployment/bill_of_materials"
+  fi
 
+  if [[ $RERELEASE -eq 1 ]]; then
+    echo "Re-release, not updating version files in git"
+  else
     git add deployment/build_no
     git add deployment/bill_of_materials.txt
     git add deployment/bill_of_materials.info
@@ -118,7 +132,7 @@ build_tars() {
   local releases_folder="$PWD/releases"
 
   mkdir -p $releases_folder
-  
+
   if [[ -z $RELEASE_APP ]]; then
     for app in $(ls _build/default/rel)
     do
@@ -188,7 +202,7 @@ usage() {
       echo
       ;;
     "release")
-      echo "vir release [-d] [-r] [-a <app_name>]"
+      echo "vir release [-d] [-r] [-a <app_name>] [-v <major>.<minor>.<build>] [-l <build_label>]"
       echo "---"
       echo "   Creates a self extracting tar of each application and updates the versions (if available)"
       echo "   -d is a dirty release (don't build deps, don't clean all)"
@@ -196,6 +210,10 @@ usage() {
       echo "   -r is used to re-release whatever the current version number is, so the current version number"
       echo "   is used without being incremented. Use with care."
       echo "   -a app_name just does the release / tar of app_name"
+      echo "   -v 1.0.0 uses the provided version number rather than generating a new one. The provided version"
+      echo "      version will be written to the deployment/ files as normal"
+      echo "   -l v1.0.0-blah uses the specified build label rather than generating one. The provided label"
+      echo "      will be written to a shared version.hrl as normal"
       echo
       ;;
     *)
@@ -223,6 +241,8 @@ DIRTYRELEASE=0
 RERELEASE=0
 COOKIE='cookie'
 KERNEL='-kernel inet_dist_listen_min 9100 inet_dist_listen_max 9105 +K true +A 10'
+MANUAL_VERSION=
+MANUAL_VERSION_LABEL=
 
 check_vir_path() {
   if [[ ! -d $SOURCEDIR ]]; then
@@ -255,6 +275,12 @@ case "$COMMAND" in
           ;;
         a)
           RELEASE_APP=$OPTARG
+          ;;
+        v)
+          MANUAL_VERSION=$OPTARG
+          ;;
+        l)
+          MANUAL_VERSION_LABEL=$OPTARG
           ;;
         ?)
           echo "Error: unknown option -$OPTARG"
