@@ -156,9 +156,9 @@ build_tar() {
   local tar_name="${tar_dir}.tar.gz"
   local autorun_name="$releases_folder/install-${tar_name%.tar.gz}"
 
-  if [[ -f ./release-files/pre_tar.sh ]]; then
+  if [[ -f apps/$app/release-files/pre_tar.sh ]]; then
       echo Running pre-tar script for $app
-      ./release-files/pre_tar.sh
+      apps/$app//release-files/pre_tar.sh
   fi
 
   echo Building $app Archive...
@@ -170,9 +170,9 @@ build_tar() {
   mv $tar_dir $app
   popd > /dev/null
 
-  if [[ -f ./release-files/post_tar.sh ]]; then
+  if [[ -f apps/$app/release-files/post_tar.sh ]]; then
     echo Running post-tar script for $app
-    ./release-files/post_tar.sh $tar_name $git_tag
+    apps/$app/release-files/post_tar.sh $tar_name $git_tag
   else
     cat $SOURCEDIR/autoextract.sh $releases_folder/$tar_name > $autorun_name
     chmod +x $autorun_name
