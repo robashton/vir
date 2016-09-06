@@ -83,6 +83,7 @@ build_release() {
     git add deployment/build_no
     git add deployment/bill_of_materials.txt
     git add deployment/bill_of_materials.info
+    git add deployment/label
 
     ls -d apps/*/include | xargs -n 1 git add
 
@@ -265,7 +266,7 @@ case "$COMMAND" in
     ;;
   "release")
     RELEASE_APP=
-    while getopts ":dra:" option; do
+    while getopts ":dra:v:l:" option; do
       case "$option" in
         d)
           DIRTYRELEASE=1
