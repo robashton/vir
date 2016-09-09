@@ -65,7 +65,9 @@ build_release() {
 
   if [[ -z $RELEASE_APP ]]; then
     echo "Releasing all apps"
-    ls -l apps | awk '{print $9}' | xargs -L 1 rebar3 release -n
+    for app in $(ls apps/); do
+      rebar3 release -n $app
+    done
   else
     echo "Releasing $RELEASE_APP"
     rebar3 release $RELEASE_APP
